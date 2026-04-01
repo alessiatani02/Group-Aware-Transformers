@@ -1,11 +1,22 @@
 import torch
 import pandas as pd
 
+def collate_tokens(values, pad_idx=0):
+    import torch
+    
+    max_len = max(v.size(0) for v in values)
+    res = torch.full((len(values), max_len), pad_idx, dtype=values[0].dtype)
+    
+    for i, v in enumerate(values):
+        res[i, :v.size(0)] = v
+        
+    return res
+
 from typing import Tuple
 from torch import cat, flatten, sigmoid
 from torch.nn import Module, ModuleList, Linear, ReLU, Sequential, Dropout, Parameter
 from torch.distributions.multivariate_normal import MultivariateNormal
-from fairseq.data.data_utils import collate_tokens
+#from fairseq.data.data_utils import collate_tokens
 
 from .nli_base import NaturalLanguageInference
 

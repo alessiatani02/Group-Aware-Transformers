@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-EMBEDDINGS = torch.load(r"C:\TESI\embeddings.pt")
+EMBEDDINGS = torch.load("/work/u10767335/embeddings/embeddings_10k.pt")
 
 from torch.optim import Adam
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss

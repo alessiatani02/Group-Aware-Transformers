@@ -109,7 +109,7 @@ def mode(x):
 def load_veridicality():
     import pandas as pd
     
-    df = pd.read_csv(r"C:\TESI\amazon_model_dataset_10k.csv")
+    df = pd.read_csv("/work/u10767335/data/amazon_model_dataset_10k.csv")
 
     df["hypothesis"] = "This is a product review."
 
