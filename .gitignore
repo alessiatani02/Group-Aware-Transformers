@@ -1,0 +1,30 @@
+# Data
+data/
+*.csv
+*.gz
+*.json
+*.parquet
+
+# Embeddings
+*.pt
+*.npy
+*.pkl
+
+# Checkpoints / models
+checkpoints/
+*.ckpt
+
+# Python
+__pycache__/
+*.pyc
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+venv/
+.env
