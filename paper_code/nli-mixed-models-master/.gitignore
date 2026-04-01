@@ -1,0 +1,13 @@
+*.swp
+*__pycache__
+**/__pycache__
+**/__pycache__/*
+*.ipynb_checkpoints
+*.log
+*.pyc
+*.egg-info
+*.icloud
+*checkpoints/
+build/
+dist/
+env/
