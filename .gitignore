@@ -28,3 +28,4 @@ Thumbs.db
 # Env
 venv/
 .env
+!paper_code/nli-mixed-models-master/scripts/categorical/train_categorical_nli.json

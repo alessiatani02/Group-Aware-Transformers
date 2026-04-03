@@ -1,0 +1,28 @@
+{
+  "checkpoints":{
+    "ckpt_dir":"/work/u10767335/checkpoints",
+    "ckpt_file_name":"categorical",
+    "save_ckpts":true
+  },
+  "hyper":{
+    "embedding_dim":[768],
+    "n_predictor_layers":[1],
+    "hidden_dim":[128],
+    "setting":["extended"],
+    "use_sampling":[false],
+    "n_samples":[100],
+    "train_bert_layers":[0],
+    "device":["cuda"]
+  },
+  "training":{
+    "n_epochs":[1],
+    "lr":[0.001],
+    "verbosity":[10],
+    "batch_size":[32]
+  },
+  "settings":{
+    "use_random_slopes":false,
+    "split_type":"annotator",
+    "k_folds":5
+  }
+}
