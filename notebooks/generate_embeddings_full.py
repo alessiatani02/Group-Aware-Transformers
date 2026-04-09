@@ -25,7 +25,7 @@ chunk_id = 0
 
 for df_chunk in df_iter:
 
-    sentences = df_chunk["reviewText"].dropna().tolist()
+    sentences = df_chunk["text"].dropna().tolist()
 
     chunk_embeddings = []
 
