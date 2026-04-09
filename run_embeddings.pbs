@@ -1,0 +1,13 @@
+!/bin/bash
+#PBS -N embeddings_job
+#PBS -q gpu
+#PBS -l select=1:ngpus=1
+#PBS -l walltime=08:00:00
+#PBS -j oe
+
+cd /work/u10767335/thesis-mixed-effects
+
+source ~/my_envs/thesis_env/bin/activate
+
+python notebooks/generate_embeddings_full.py
+
