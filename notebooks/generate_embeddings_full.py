@@ -21,16 +21,22 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 df_iter = pd.read_json(DATA_PATH, lines=True, chunksize=50000)
 
 batch_size = 32
-chunk_id = 0
+existing_files = os.listdir(OUTPUT_DIR)
+chunk_id = len(existing_files)
 
-for df_chunk in df_iter:
+print(f"Starting from chunk {chunk_id}")
+
+for i, df_chunk in enumerate(df_iter):
+
+    if i < chunk_id:
+        continue
 
     sentences = df_chunk["text"].dropna().tolist()
 
     chunk_embeddings = []
 
-    for i in range(0, len(sentences), batch_size):
-        batch = sentences[i:i+batch_size]
+    for j in range(0, len(sentences), batch_size):
+        batch = sentences[j:j+batch_size]
 
         inputs = tokenizer(
             batch,
