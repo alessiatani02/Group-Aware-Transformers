@@ -1,6 +1,7 @@
 import argparse, json, torch
 import numpy as np
 import os
+import pandas as pd
 
 from nli_mixed_models.trainers.nli_trainer import (
     CategoricalRandomInterceptsTrainer,
@@ -36,10 +37,16 @@ def main(args):
         for trainparams in parameter_grid(params["training"]):
 
             # Load MegaVeridicality data
-            LOG.info("Loading MegaVeridicality data...")
-            ver = load_veridicality()
-            hyperparams["n_participants"] = ver.participant.unique().shape[0]
-            hyperparams["n_items"] = ver.item.unique().shape[0]
+            LOG.info("Loading Amazon dataset...")
+            ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
+            #per il test
+            ver = ver.iloc[:50000]
+            ver["participant"] = ver["participant"].astype("category").cat.codes
+            ver["modal_response"] = ver["target"]
+            ver["modal_response"] = ver["modal_response"].astype(int)
+            hyperparams["n_participants"] = ver.participant.nunique()
+            hyperparams["n_items"] = len(ver)
+
             LOG.info("...Complete.")
 
             # Log the device being used
@@ -51,10 +58,12 @@ def main(args):
             split_type = settings["split_type"]
             setting = hyperparams["setting"]
             ver = generate_splits(ver, split_type, k_folds=k_folds, datatype="v")
+            ver = ver.reset_index(drop=False).rename(columns={"index": "orig_index"})
+            ver = ver.set_index("orig_index")
             LOG.info(
                 f"Beginning training with {k_folds}-fold cross-validation in the {setting} setting, partitioning based on {split_type}."
             )
-
+            
             # Save the DataFrame used for training + eval, in case
             # we need to recover it later.
             data_file_name = (

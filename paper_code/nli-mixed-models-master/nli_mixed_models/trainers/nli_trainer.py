@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-EMBEDDINGS = torch.load("/work/u10767335/embeddings/embeddings_10k.pt")
+#EMBEDDINGS = torch.load("/work/u10767335/embeddings/embeddings_10k.pt")
 
 from torch.optim import Adam
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss
@@ -130,10 +130,7 @@ class NaturalLanguageInferenceTrainer:
                 modal_response = self.TARGET_TYPE(items.modal_response.values).to(
                     self.device
                 )
-                indices = items.index.values
-                embedding = EMBEDDINGS[indices].to(self.device)
-                embedding = embedding.float()
-                embedding = embedding.unsqueeze(1)
+                embedding = self.nli.embed(items)
 
                 # Get model prediction and random loss (converting the latter as appropriate)
                 prediction, random_loss = self.nli(embedding, participant, item)
