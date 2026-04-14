@@ -1,5 +1,6 @@
 import torch
 import pandas as pd
+import os
 
 from typing import Tuple
 from torch.nn import Module
@@ -42,25 +43,38 @@ class NaturalLanguageInference(Module):
         #disattivo completamente roberta
         self.roberta = None
 
-        # CARICO EMBEDDINGS UNA SOLA VOLTA
-        self.all_embeddings = torch.load(
-            "/work/u10767335/embeddings/embeddings_10k.pt"
-        ).to(self.device)
+        self.emb_dir = "/work/u10767335/embeddings_chunks"
+        self.chunk_size = 50000
+        self.loaded_chunks = {}  # cache
 
     def forward(
         self, embeddings, participant=None, item=None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         prediction, random_loss = None, None
         return prediction, random_loss
-
+    
     def embed(self, items: pd.DataFrame) -> torch.Tensor:
-        """
-        Usa embeddings precomputati (già caricati in memoria)
-        """
+        
+        indices = items.index.values
 
-        # seleziona embeddings del batch
-        batch_indices = items.index.values
-        batch_embeddings = self.all_embeddings[batch_indices]
+        embeddings = []
 
-        # aggiunge dimensione richiesta dal modello
+        for idx in indices:
+
+            chunk_id = idx // self.chunk_size
+            local_idx = idx % self.chunk_size
+
+            # carica chunk se non già in cache
+            if chunk_id not in self.loaded_chunks:
+                path = os.path.join(
+                    self.emb_dir, f"embeddings_chunk_{chunk_id}.pt"
+                )
+                self.loaded_chunks[chunk_id] = torch.load(path).to(self.device)
+
+            chunk = self.loaded_chunks[chunk_id]
+
+            embeddings.append(chunk[local_idx])
+
+        batch_embeddings = torch.stack(embeddings)
+
         return batch_embeddings.unsqueeze(1)
