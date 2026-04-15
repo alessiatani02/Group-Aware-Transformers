@@ -40,10 +40,11 @@ def main(args):
             LOG.info("Loading Amazon dataset...")
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
             #per il test
-            ver = ver.iloc[:50000]
-            ver["participant"] = ver["participant"].astype("category").cat.codes
+            #ver = ver.iloc[:50000]
+            ver["participant"] = pd.factorize(ver["participant"])[0]
             ver["modal_response"] = ver["target"]
             ver["modal_response"] = ver["modal_response"].astype(int)
+            ver["target"] = ver["target"].astype(int)
             hyperparams["n_participants"] = ver.participant.nunique()
             hyperparams["n_items"] = len(ver)
 
@@ -58,8 +59,7 @@ def main(args):
             split_type = settings["split_type"]
             setting = hyperparams["setting"]
             ver = generate_splits(ver, split_type, k_folds=k_folds, datatype="v")
-            ver = ver.reset_index(drop=False).rename(columns={"index": "orig_index"})
-            ver = ver.set_index("orig_index")
+            ver = ver.reset_index(drop=True)
             LOG.info(
                 f"Beginning training with {k_folds}-fold cross-validation in the {setting} setting, partitioning based on {split_type}."
             )
