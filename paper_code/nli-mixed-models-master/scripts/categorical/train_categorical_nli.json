@@ -12,12 +12,12 @@
     "use_sampling":[false],
     "n_samples":[100],
     "train_bert_layers":[0],
-    "device":["cuda"]
+    "device":["cpu"]
   },
   "training":{
     "n_epochs":[1],
     "lr":[0.001],
-    "verbosity":[50],
+    "verbosity":[10],
     "batch_size":[32]
   },
   "settings":{

@@ -134,11 +134,11 @@ class NaturalLanguageInferenceTrainer:
 
                 # Get model prediction and random loss (converting the latter as appropriate)
                 prediction, random_loss = self.nli(embedding, participant, item)
-                random_loss = (
-                    random_loss
-                    if isinstance(random_loss, float)
-                    else random_loss.item()
-                )
+                if isinstance(random_loss, float):
+                    random_loss = torch.tensor(random_loss, device=self.device)
+
+                if batch % 50 == 0:
+                    print("random_loss:", random_loss.detach().cpu().item())
 
                 # If unit case, get final prediction by calculating mode of predicted beta distribution
                 if self.data_type == "unit":
@@ -156,7 +156,7 @@ class NaturalLanguageInferenceTrainer:
                 # Shouldn't this include the random loss? -B.K.
                 # loss_trace.append(loss.item()-random_loss.item())
                 fixed_loss_trace.append(fixed_loss.item())
-                random_loss_trace.append(random_loss)
+                random_loss_trace.append(random_loss.detach().cpu().item())
                 loss_trace.append(loss.item())
                 all_loss_trace.append(loss.item())
                 epoch_loss_trace.append(loss.item())

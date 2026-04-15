@@ -37,17 +37,18 @@ def main(args):
         for trainparams in parameter_grid(params["training"]):
 
             # Load MegaVeridicality data
+            print("START LOADING CSV", flush=True)
             LOG.info("Loading Amazon dataset...")
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
             #per il test
-            #ver = ver.iloc[:50000]
+            ver = ver.iloc[:10000]
             ver["participant"] = pd.factorize(ver["participant"])[0]
             ver["modal_response"] = ver["target"]
             ver["modal_response"] = ver["modal_response"].astype(int)
             ver["target"] = ver["target"].astype(int)
             hyperparams["n_participants"] = ver.participant.nunique()
             hyperparams["n_items"] = len(ver)
-
+            print("CSV LOADED", flush=True)
             LOG.info("...Complete.")
 
             # Log the device being used
