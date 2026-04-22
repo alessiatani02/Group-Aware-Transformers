@@ -21,6 +21,7 @@ LOG = setup_logging()
 
 def main(args):
 
+    print("=== JOB STARTED ===", flush=True)
     # Load parameters from the supplied parameters file
     with open(args.parameters) as f:
         params = json.load(f)
@@ -41,7 +42,7 @@ def main(args):
             LOG.info("Loading Amazon dataset...")
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
             #per il test
-            ver = ver.iloc[:10000]
+            ver = ver.iloc[:100000]
             ver["participant"] = pd.factorize(ver["participant"])[0]
             ver["modal_response"] = ver["target"]
             ver["modal_response"] = ver["modal_response"].astype(int)
@@ -212,7 +213,7 @@ def main(args):
             LOG.info(f"Mean random loss:    {np.round(np.mean(random_loss_all_b), 4)} ± {np.round(np.std(random_loss_all_b), 4)}")
             LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all_b), 4)} ± {np.round(np.std(acc_all_b), 4)}")
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)} ± {np.round(np.std(best_all_b), 4)}")
-
+            print("=== TRAINING FINISHED ===", flush=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

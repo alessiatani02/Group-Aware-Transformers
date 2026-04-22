@@ -15,7 +15,7 @@
     "device":["cpu"]
   },
   "training":{
-    "n_epochs":[1],
+    "n_epochs":[5],
     "lr":[0.001],
     "verbosity":[10],
     "batch_size":[32]
