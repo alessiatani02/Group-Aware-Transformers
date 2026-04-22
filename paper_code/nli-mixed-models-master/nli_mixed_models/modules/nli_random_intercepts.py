@@ -1,5 +1,6 @@
 import torch
 import pandas as pd
+import torch.nn.functional as F
 
 def collate_tokens(values, pad_idx=0):
     import torch
@@ -153,8 +154,12 @@ class CategoricalRandomIntercepts(RandomInterceptsModel):
         )
 
         # The number of random effects per annotator is equivalent to the output dimension.
-        self.mean = torch.zeros(self.output_dim)
-        self.cov = torch.zeros(((self.output_dim), (self.output_dim)))
+        self.mean = torch.zeros(self.output_dim, device=device)
+        self.raw_cov_diag = Parameter(torch.zeros(self.output_dim, device=device))
+    
+    def _cov_matrix(self):
+        var = F.softplus(self.raw_cov_diag) + EPSILON
+        return torch.diag(var)
 
     def _initialize_random_effects(self):
         """Initializes random effects - random intercept terms generated from a standard normal."""
@@ -173,7 +178,8 @@ class CategoricalRandomIntercepts(RandomInterceptsModel):
         elif participant is None:
             # If using sampling, sample from random effects priors, otherwise use mean
             if self.use_sampling:
-                random = MultivariateNormal(self.mean, self.cov).sample()[None, :]
+                cov = self._cov_matrix()
+                random = MultivariateNormal(self.mean, covariance_matrix=cov).sample()[None, :]
             else:
                 random = random.mean(0)[None, :]
             return fixed + random
@@ -182,23 +188,18 @@ class CategoricalRandomIntercepts(RandomInterceptsModel):
             return fixed + random[participant]
 
     def _random_loss(self, random):
-        """Compute loss over random effect priors.
+        var = F.softplus(self.raw_cov_diag) + EPSILON
+        inv_var = 1.0 / var
 
-        NOTE: the random loss is computed over all annotators
-        at each iteration, regardless of whether all annotators appeared
-        in the currernt batch (which they almost certainly didn't). This
-        is okay, since the purpose of the random loss is really just to
-        enforce normality on the random effects.
-        """
-        self.mean = torch.zeros(self.output_dim)
-        self.cov = torch.matmul(torch.transpose(random, 1, 0), random) / (
-            self.n_participants - 1
-        )
-        invcov = torch.inverse(self.cov)
-        return torch.matmul(
-            torch.matmul(random.unsqueeze(1), invcov),
-            torch.transpose(random.unsqueeze(1), 1, 2),
-        ).mean(0)
+        centered = random - self.mean[None, :]
+
+        # Mahalanobis term
+        mahalanobis = (centered**2 * inv_var[None, :]).sum(dim=1).mean()
+
+        # log determinant term
+        logdet = torch.log(var).sum()
+
+        return mahalanobis + logdet
 
 
 class UnitRandomIntercepts(RandomInterceptsModel):

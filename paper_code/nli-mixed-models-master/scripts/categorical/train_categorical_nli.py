@@ -200,25 +200,18 @@ def main(args):
 
             LOG.info("Finished k-fold cross evaluation.")
             LOG.info("Subtask a results:")
-            LOG.info(f"Mean loss:           {np.round(np.mean(loss_all), 4)}")
-            LOG.info(
-                f"Mean fixed loss:           {np.round(np.mean(fixed_loss_all), 4)}"
-            )
-            LOG.info(
-                f"Mean random loss:           {np.round(np.mean(random_loss_all), 4)}"
-            )
-            LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all), 4)}")
-            LOG.info(f"Prop. best possible: {np.round(np.mean(best_all), 4)}")
+            LOG.info(f"Mean loss:           {np.round(np.mean(loss_all), 4)} ± {np.round(np.std(loss_all), 4)}")
+            LOG.info(f"Mean fixed loss:     {np.round(np.mean(fixed_loss_all), 4)} ± {np.round(np.std(fixed_loss_all), 4)}")
+            LOG.info(f"Mean random loss:    {np.round(np.mean(random_loss_all), 4)} ± {np.round(np.std(random_loss_all), 4)}")
+            LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all), 4)} ± {np.round(np.std(acc_all), 4)}")
+            LOG.info(f"Prop. best possible: {np.round(np.mean(best_all), 4)} ± {np.round(np.std(best_all), 4)}")
+            
             LOG.info("Subtask b results:")
-            LOG.info(f"Mean loss:           {np.round(np.mean(loss_all_b), 4)}")
-            LOG.info(
-                f"Mean fixed loss:           {np.round(np.mean(fixed_loss_all_b), 4)}"
-            )
-            LOG.info(
-                f"Mean random loss:           {np.round(np.mean(random_loss_all_b), 4)}"
-            )
-            LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all_b), 4)}")
-            LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)}")
+            LOG.info(f"Mean loss:           {np.round(np.mean(loss_all_b), 4)} ± {np.round(np.std(loss_all_b), 4)}")
+            LOG.info(f"Mean fixed loss:     {np.round(np.mean(fixed_loss_all_b), 4)} ± {np.round(np.std(fixed_loss_all_b), 4)}")
+            LOG.info(f"Mean random loss:    {np.round(np.mean(random_loss_all_b), 4)} ± {np.round(np.std(random_loss_all_b), 4)}")
+            LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all_b), 4)} ± {np.round(np.std(acc_all_b), 4)}")
+            LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)} ± {np.round(np.std(best_all_b), 4)}")
 
 
 if __name__ == "__main__":
