@@ -2,6 +2,7 @@ import argparse, json, torch
 import numpy as np
 import os
 import pandas as pd
+from datetime import datetime
 
 from nli_mixed_models.trainers.nli_trainer import (
     CategoricalRandomInterceptsTrainer,
@@ -33,11 +34,12 @@ def main(args):
     checkpoint_file_name = checkpoints["ckpt_file_name"]
 
     os.makedirs(checkpoint_dir, exist_ok=True)
+    results_dir = "/work/u10767335/results"
+    os.makedirs(results_dir, exist_ok=True)
 
     for hyperparams in parameter_grid(params["hyper"]):
         for trainparams in parameter_grid(params["training"]):
 
-            # Load MegaVeridicality data
             print("START LOADING CSV", flush=True)
             LOG.info("Loading Amazon dataset...")
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
@@ -51,6 +53,9 @@ def main(args):
             hyperparams["n_items"] = len(ver)
             print("CSV LOADED", flush=True)
             LOG.info("...Complete.")
+
+            n_samples = len(ver)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
             # Log the device being used
             device = hyperparams["device"]
@@ -91,6 +96,9 @@ def main(args):
             random_loss_all_b = []
             acc_all_b = []
             best_all_b = []
+
+            fold_results = []
+
             for i in range(k_folds):
 
                 # Dump current training settings
@@ -198,6 +206,18 @@ def main(args):
                 LOG.info(f"Mean random loss:    {random_loss_mean}")
                 LOG.info(f"Mean accuracy:       {acc_mean}")
                 LOG.info(f"Prop. best possible: {best_mean}")
+                # === AGGIUNTO: salvataggio risultati per fold ===
+                fold_results.append({
+                    "fold": i,
+                    "loss_a": loss_all[-1],
+                    "fixed_loss_a": fixed_loss_all[-1],
+                    "random_loss_a": random_loss_all[-1],
+                    "acc_a": acc_all[-1],
+                    "loss_b": loss_all_b[-1],
+                    "fixed_loss_b": fixed_loss_all_b[-1],
+                    "random_loss_b": random_loss_all_b[-1],
+                    "acc_b": acc_all_b[-1],
+                })
 
             LOG.info("Finished k-fold cross evaluation.")
             LOG.info("Subtask a results:")
@@ -213,7 +233,52 @@ def main(args):
             LOG.info(f"Mean random loss:    {np.round(np.mean(random_loss_all_b), 4)} ± {np.round(np.std(random_loss_all_b), 4)}")
             LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all_b), 4)} ± {np.round(np.std(acc_all_b), 4)}")
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)} ± {np.round(np.std(best_all_b), 4)}")
+
+            # === AGGIUNTO: salvataggio CSV ===
+
+            # --- risultati per fold ---
+            df_folds = pd.DataFrame(fold_results)
+            df_folds.to_csv(
+                f"{results_dir}/results_{n_samples}_{timestamp}.csv",
+                index=False
+            )
+
+            # --- summary finale ---
+            df_summary = pd.DataFrame([{
+                "n_samples": n_samples,
+
+                "mean_loss_a": np.mean(loss_all),
+                "std_loss_a": np.std(loss_all),
+
+                "mean_fixed_loss_a": np.mean(fixed_loss_all),
+                "std_fixed_loss_a": np.std(fixed_loss_all),
+
+                "mean_random_loss_a": np.mean(random_loss_all),
+                "std_random_loss_a": np.std(random_loss_all),
+
+                "mean_acc_a": np.mean(acc_all),
+                "std_acc_a": np.std(acc_all),
+
+                "mean_loss_b": np.mean(loss_all_b),
+                "std_loss_b": np.std(loss_all_b),
+
+                "mean_fixed_loss_b": np.mean(fixed_loss_all_b),
+                "std_fixed_loss_b": np.std(fixed_loss_all_b),
+
+                "mean_random_loss_b": np.mean(random_loss_all_b),
+                "std_random_loss_b": np.std(random_loss_all_b),
+
+                "mean_acc_b": np.mean(acc_all_b),
+                "std_acc_b": np.std(acc_all_b),
+            }])
+
+            df_summary.to_csv(
+                f"{results_dir}/summary_{n_samples}_{timestamp}.csv",
+                index=False
+            )
+
             print("=== TRAINING FINISHED ===", flush=True)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
