@@ -99,6 +99,7 @@ def main(args):
 
             fold_results = []
             all_epochs_results = [] 
+            all_random_effects = [] 
 
             for i in range(k_folds):
 
@@ -151,6 +152,7 @@ def main(args):
                 print("\n=== RANDOM EFFECTS ===")
                 print("Shape:", re.shape)
                 print("Prime 10 righe:\n", re[:10])
+                all_random_effects.append(re)
 
                 # Save the model
                 if save_checkpoints:
@@ -252,6 +254,15 @@ def main(args):
             # === AGGIUNTO: salvataggio CSV ===
 
             df_epochs = pd.concat(all_epochs_results, ignore_index=True)
+
+            # === AGGIUNTO: salvataggio unico random effects ===
+            if len(all_random_effects) > 0:
+                re_all = np.vstack(all_random_effects)
+
+                np.save(
+                    f"{results_dir}/random_effects_ALL_{n_samples}_{timestamp}.npy",
+                    re_all
+                )
 
             df_epochs.to_csv(
                 f"{results_dir}/epochs_ALL_{n_samples}_{timestamp}.csv",
