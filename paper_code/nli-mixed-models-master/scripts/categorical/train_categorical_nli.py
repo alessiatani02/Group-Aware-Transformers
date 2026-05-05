@@ -98,6 +98,7 @@ def main(args):
             best_all_b = []
 
             fold_results = []
+            all_epochs_results = [] 
 
             for i in range(k_folds):
 
@@ -130,8 +131,22 @@ def main(args):
                 test_data = ver[ver.fold == test_fold]
 
                 # Fit the model on the train folds
-                cat_model = cnli_trainer.fit(train_data=train_data, **trainparams)
+                cat_model, history = cnli_trainer.fit(train_data=train_data, **trainparams)
                 LOG.info("Finished training.")
+                # === AGGIUNTO: salvataggio history per epoca ===
+                epoch_df = pd.DataFrame({
+                    "epoch": list(range(len(history["loss"]))),
+                    "loss": history["loss"],
+                    "fixed_loss": history["fixed_loss"],
+                    "random_loss": history["random_loss"],
+                    "accuracy": history["accuracy"],
+                    "fold": i
+                })
+
+                all_epochs_results.append(epoch_df) 
+                
+
+
                 re = cat_model.random_effects.detach().cpu().numpy()
                 print("\n=== RANDOM EFFECTS ===")
                 print("Shape:", re.shape)
@@ -235,6 +250,13 @@ def main(args):
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)} ± {np.round(np.std(best_all_b), 4)}")
 
             # === AGGIUNTO: salvataggio CSV ===
+
+            df_epochs = pd.concat(all_epochs_results, ignore_index=True)
+
+            df_epochs.to_csv(
+                f"{results_dir}/epochs_ALL_{n_samples}_{timestamp}.csv",
+                index=False
+            )
 
             # --- risultati per fold ---
             df_folds = pd.DataFrame(fold_results)

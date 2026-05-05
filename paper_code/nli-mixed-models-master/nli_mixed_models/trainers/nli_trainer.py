@@ -97,6 +97,15 @@ class NaturalLanguageInferenceTrainer:
         all_loss_trace = []
         iters_without_improvement = 0
         prev_epoch_mean_loss = np.inf
+
+##############################
+        history = {
+            "loss": [],
+            "fixed_loss": [],
+            "random_loss": [],
+            "accuracy": []  
+        }
+##################################
         for epoch in range(n_epochs):
 
             train_data = train_data.sample(frac=1).reset_index(drop=True)
@@ -110,7 +119,13 @@ class NaturalLanguageInferenceTrainer:
             fixed_loss_trace = []
             metric_trace = []
             best_trace = []
+            
+
+            ### ADDED: epoch-level tracking 
             epoch_loss_trace = []
+            epoch_fixed_trace = []
+            epoch_random_trace = []
+            epoch_acc_trace = []
 
             for batch, items in train_data.groupby("batch_idx"):
                 self.nli.zero_grad()
@@ -161,11 +176,15 @@ class NaturalLanguageInferenceTrainer:
                 all_loss_trace.append(loss.item())
                 epoch_loss_trace.append(loss.item())
 
+                epoch_fixed_trace.append(fixed_loss.item())
+                epoch_random_trace.append(random_loss.detach().cpu().item())
+
                 if self.data_type == "categorical":
                     acc = accuracy(prediction, target)
                     best = accuracy_best(items)
                     metric_trace.append(acc)
                     best_trace.append(acc / best)
+                    epoch_acc_trace.append(acc)
 
                 elif self.data_type == "unit":
                     error = absolute_error(prediction, target)
@@ -207,7 +226,23 @@ class NaturalLanguageInferenceTrainer:
                 loss.backward()
                 optimizer.step()
 
+        ################################
+            # ### ADDED: calcolo metriche per epoca
             cur_epoch_mean_loss = np.mean(epoch_loss_trace)
+            epoch_fixed_mean = np.mean(epoch_fixed_trace)
+            epoch_random_mean = np.mean(epoch_random_trace)
+
+            if self.data_type == "categorical":
+                epoch_acc_mean = np.mean(epoch_acc_trace)
+            else:
+                epoch_acc_mean = np.nan
+
+            history["loss"].append(cur_epoch_mean_loss)
+            history["fixed_loss"].append(epoch_fixed_mean)
+            history["random_loss"].append(epoch_random_mean)
+            history["accuracy"].append(epoch_acc_mean)
+            ########################################
+
             print(f"prev epoch mean loss: {prev_epoch_mean_loss}")
             print(f"cur epoch mean loss: {cur_epoch_mean_loss}")
             if prev_epoch_mean_loss - cur_epoch_mean_loss > 0.01:
@@ -216,9 +251,9 @@ class NaturalLanguageInferenceTrainer:
                 LOG.info(
                     "No performance improvement over previous epoch. " "Stopping early."
                 )
-                return self.nli
+                return self.nli, history
 
-        return self.nli.eval()
+        return self.nli.eval(), history
 
 
 # Custom loss functions
