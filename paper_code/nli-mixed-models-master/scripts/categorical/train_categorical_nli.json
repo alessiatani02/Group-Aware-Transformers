@@ -12,7 +12,7 @@
     "use_sampling":[false],
     "n_samples":[100],
     "train_bert_layers":[0],
-    "device":["cpu"]
+    "device":["cuda"]
   },
   "training":{
     "n_epochs":[5],
