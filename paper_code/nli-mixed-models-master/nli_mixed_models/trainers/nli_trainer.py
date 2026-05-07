@@ -78,6 +78,7 @@ class NaturalLanguageInferenceTrainer:
         n_epochs: int = 10,
         lr: float = 1e-2,
         verbosity: int = 10,
+        lambda_random: float = 1.0
     ):
 
         optimizer = Adam(self.nli.parameters(), lr=lr)
@@ -166,7 +167,7 @@ class NaturalLanguageInferenceTrainer:
                 else:
                     fixed_loss = lossfunc(prediction, target)
 
-                loss = fixed_loss + random_loss
+                loss = fixed_loss + lambda_random * random_loss
 
                 # Shouldn't this include the random loss? -B.K.
                 # loss_trace.append(loss.item()-random_loss.item())
