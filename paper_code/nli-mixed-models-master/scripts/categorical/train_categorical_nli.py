@@ -49,7 +49,6 @@ def main(args):
             print(f"Numero di gruppi (products): {n_groups}")
             LOG.info(f"Number of groups (products): {n_groups}")
 
-
             ver["participant"] = pd.factorize(ver["participant"])[0]
             ver["modal_response"] = ver["target"]
             ver["modal_response"] = ver["modal_response"].astype(int)
@@ -260,14 +259,7 @@ def main(args):
 
             df_epochs = pd.concat(all_epochs_results, ignore_index=True)
 
-            # === AGGIUNTO: salvataggio unico random effects ===
-            if len(all_random_effects) > 0:
-                re_all = np.vstack(all_random_effects)
-
-                np.save(
-                    f"{results_dir}/random_effects_ALL_{n_samples}_{timestamp}.npy",
-                    re_all
-                )
+            
 
             df_epochs.to_csv(
                 f"{results_dir}/epochs_ALL_{n_samples}_{timestamp}.csv",
@@ -285,6 +277,7 @@ def main(args):
             df_summary = pd.DataFrame([{
                 "n_samples": n_samples,
                  "n_groups": n_groups,
+                 "lambda_random": trainparams["lambda_random"],
 
                 "mean_loss_a": np.mean(loss_all),
                 "std_loss_a": np.std(loss_all),
@@ -315,6 +308,19 @@ def main(args):
                 f"{results_dir}/summary_{n_samples}_{timestamp}.csv",
                 index=False
             )
+
+
+             #=== AGGIUNTO: salvataggio unico random effects ===
+            if len(all_random_effects) > 0:
+                re_all = np.concatenate(all_random_effects, axis=0)
+
+                np.save(
+                    f"{results_dir}/random_effects_ALL_{n_samples}_{timestamp}.npy",
+                    re_all
+                )
+
+
+
 
             print("=== TRAINING FINISHED ===", flush=True)
 
