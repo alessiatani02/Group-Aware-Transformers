@@ -45,6 +45,11 @@ def main(args):
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
             #per il test
             ver = ver.iloc[:50000]
+            n_groups = ver["participant"].nunique()
+            print(f"Numero di gruppi (products): {n_groups}")
+            LOG.info(f"Number of groups (products): {n_groups}")
+
+
             ver["participant"] = pd.factorize(ver["participant"])[0]
             ver["modal_response"] = ver["target"]
             ver["modal_response"] = ver["modal_response"].astype(int)
