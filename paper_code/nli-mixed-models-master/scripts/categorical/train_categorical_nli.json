@@ -18,7 +18,8 @@
     "n_epochs":[5],
     "lr":[0.001],
     "verbosity":[10],
-    "batch_size":[32]
+    "batch_size":[32],
+    "lambda_random": [10]
   },
   "settings":{
     "use_random_slopes":false,

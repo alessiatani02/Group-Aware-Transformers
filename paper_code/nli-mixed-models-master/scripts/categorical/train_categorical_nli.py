@@ -279,6 +279,7 @@ def main(args):
             # --- summary finale ---
             df_summary = pd.DataFrame([{
                 "n_samples": n_samples,
+                 "n_groups": n_groups,
 
                 "mean_loss_a": np.mean(loss_all),
                 "std_loss_a": np.std(loss_all),
