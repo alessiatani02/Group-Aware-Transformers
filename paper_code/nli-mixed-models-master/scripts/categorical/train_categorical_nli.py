@@ -42,14 +42,36 @@ def main(args):
 
             print("START LOADING CSV", flush=True)
             LOG.info("Loading Amazon dataset...")
-            ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full.csv")
+            ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full_encoded.csv")
             #per il test
-            ver = ver.iloc[:50000]
+            # ---- SAMPLE SUI GRUPPI ----
+            target_n_samples = 50000
+
+            products = ver["participant"].unique()
+            np.random.shuffle(products)
+
+            selected_products = []
+            current_n = 0
+
+            for p in products:
+                group_size = (ver["participant"] == p).sum()
+        
+                selected_products.append(p)
+                current_n += group_size
+        
+                if current_n >= target_n_samples:
+                    break
+
+            ver = ver[ver["participant"].isin(selected_products)]
+            ver["participant"] = pd.factorize(ver["participant"])[0]
+
+            print("N samples dopo group sampling:", len(ver))
+            print("N groups:", ver["participant"].nunique())
+            
             n_groups = ver["participant"].nunique()
             print(f"Numero di gruppi (products): {n_groups}")
             LOG.info(f"Number of groups (products): {n_groups}")
 
-            ver["participant"] = pd.factorize(ver["participant"])[0]
             ver["modal_response"] = ver["target"]
             ver["modal_response"] = ver["modal_response"].astype(int)
             ver["target"] = ver["target"].astype(int)
@@ -262,14 +284,14 @@ def main(args):
             
 
             df_epochs.to_csv(
-                f"{results_dir}/epochs_ALL_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/new_epochs_ALL_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
             # --- risultati per fold ---
             df_folds = pd.DataFrame(fold_results)
             df_folds.to_csv(
-                f"{results_dir}/results_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/new_results_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
@@ -305,7 +327,7 @@ def main(args):
             }])
 
             df_summary.to_csv(
-                f"{results_dir}/summary_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/new_summary_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
@@ -315,7 +337,7 @@ def main(args):
                 re_all = np.concatenate(all_random_effects, axis=0)
 
                 np.save(
-                    f"{results_dir}/random_effects_ALL_{n_samples}_{timestamp}.npy",
+                    f"{results_dir}/new_random_effects_ALL_{n_samples}_{timestamp}.npy",
                     re_all
                 )
 
