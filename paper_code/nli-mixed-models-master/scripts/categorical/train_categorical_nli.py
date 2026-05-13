@@ -84,7 +84,10 @@ def main(args):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
             # Log the device being used
-            device = hyperparams["device"]
+            if hyperparams["device"] == "cuda" and torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
             LOG.info(f"Using device {device}")
 
             # Assign folds to each veridicality example
