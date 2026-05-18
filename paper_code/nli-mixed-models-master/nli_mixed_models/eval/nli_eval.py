@@ -196,6 +196,25 @@ class NaturalLanguageInferenceEval:
             fixed_loss_mean = np.round(np.mean(fixed_loss_trace), 4)
             random_loss_mean = np.round(np.mean(random_loss_trace), 4)
 
+            if isinstance(self.nli, CategoricalRandomIntercepts) or isinstance(
+                self.nli, CategoricalRandomSlopes
+            ):
+                y_prob = torch.softmax(all_predictions, dim=1).cpu().detach().numpy()
+                y_pred = np.argmax(y_prob, axis=1)
+                y_true = all_targets.cpu().detach().numpy()
+
+                extra_outputs = {
+                    "y_true": y_true,
+                    "y_pred": y_pred,
+                    "y_prob": y_prob,
+                }
+            else:
+                extra_outputs = {
+                    "y_true": all_targets.cpu().detach().numpy(),
+                    "y_pred": all_predictions.cpu().detach().numpy(),
+                    "y_prob": None,
+                }
+
             return (
                 loss_mean,
                 fixed_loss_mean,
@@ -205,6 +224,7 @@ class NaturalLanguageInferenceEval:
                 spearman_predicted,
                 spearman_best,
                 worst_mean,
+                extra_outputs,
             )
 
 

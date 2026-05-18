@@ -17,7 +17,55 @@ from scripts.training_utils import (
     save_model_with_args,
 )
 
+from sklearn.metrics import (
+    roc_auc_score,
+    balanced_accuracy_score,
+    recall_score,
+    precision_score,
+    f1_score,
+    confusion_matrix
+)
+
 LOG = setup_logging()
+
+def compute_multiclass_metrics(y_true, y_pred, y_prob):
+    labels = np.sort(np.unique(y_true))
+
+    metrics = {
+        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
+        "sensitivity_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
+        "precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
+        "f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
+    }
+
+    try:
+        metrics["auc_ovr_macro"] = roc_auc_score(
+            y_true,
+            y_prob,
+            multi_class="ovr",
+            average="macro"
+        )
+    except ValueError:
+        metrics["auc_ovr_macro"] = np.nan
+
+    specificities = []
+
+    for label in labels:
+        y_true_bin = (y_true == label).astype(int)
+        y_pred_bin = (y_pred == label).astype(int)
+
+        tn, fp, fn, tp = confusion_matrix(
+            y_true_bin,
+            y_pred_bin,
+            labels=[0, 1]
+        ).ravel()
+
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else np.nan
+        specificities.append(specificity)
+
+    metrics["specificity_macro"] = np.nanmean(specificities)
+
+    return metrics
 
 
 def main(args):
@@ -214,19 +262,32 @@ def main(args):
                     best_mean,
                     spearman_mean,
                     best_spearman_mean,
-                    _
+                    _,
+                    extra_outputs_a
                 ) = cnli_eval.eval(test_data, trainparams["batch_size"])
                 loss_all.append(loss_mean)
                 fixed_loss_all.append(fixed_loss_mean)
                 random_loss_all.append(random_loss_mean)
                 acc_all.append(acc_mean)
                 best_all.append(best_mean)
+
+                metrics_a = compute_multiclass_metrics(
+                    extra_outputs_a["y_true"],
+                    extra_outputs_a["y_pred"],
+                    extra_outputs_a["y_prob"]
+                )
+
+
                 LOG.info(f"Test results for fold {i}, subtask a")
                 LOG.info(f"Mean loss:           {loss_mean}")
                 LOG.info(f"Mean fixed loss:     {fixed_loss_mean}")
                 LOG.info(f"Mean random loss:    {random_loss_mean}")
                 LOG.info(f"Mean accuracy:       {acc_mean}")
                 LOG.info(f"Prop. best possible: {best_mean}")
+                LOG.info(f"Balanced accuracy:   {metrics_a['balanced_accuracy']}")
+                LOG.info(f"Sensitivity macro:   {metrics_a['sensitivity_macro']}")
+                LOG.info(f"Specificity macro:   {metrics_a['specificity_macro']}")
+                LOG.info(f"AUC OVR macro:       {metrics_a['auc_ovr_macro']}")
 
                 # Evaluate the model on the test fold on subtask 'b'
                 LOG.info("Evaluating subtask b")
@@ -239,19 +300,32 @@ def main(args):
                     best_mean,
                     spearman_mean,
                     best_spearman_mean,
-                    _
+                    _,
+                    extra_outputs_b
                 ) = cnli_eval.eval(test_data, trainparams["batch_size"])
                 loss_all_b.append(loss_mean)
                 fixed_loss_all_b.append(fixed_loss_mean)
                 random_loss_all_b.append(random_loss_mean)
                 acc_all_b.append(acc_mean)
                 best_all_b.append(best_mean)
+
+                metrics_b = compute_multiclass_metrics(
+                    extra_outputs_b["y_true"],
+                    extra_outputs_b["y_pred"],
+                    extra_outputs_b["y_prob"]
+                )
+
+
                 LOG.info(f"Test results for fold {i}, subtask b")
                 LOG.info(f"Mean loss:           {loss_mean}")
                 LOG.info(f"Mean fixed loss:     {fixed_loss_mean}")
                 LOG.info(f"Mean random loss:    {random_loss_mean}")
                 LOG.info(f"Mean accuracy:       {acc_mean}")
                 LOG.info(f"Prop. best possible: {best_mean}")
+                LOG.info(f"Balanced accuracy:   {metrics_b['balanced_accuracy']}")
+                LOG.info(f"Sensitivity macro:   {metrics_b['sensitivity_macro']}")
+                LOG.info(f"Specificity macro:   {metrics_b['specificity_macro']}")
+                LOG.info(f"AUC OVR macro:       {metrics_b['auc_ovr_macro']}")
                 # === AGGIUNTO: salvataggio risultati per fold ===
                 fold_results.append({
                     "fold": i,
@@ -263,8 +337,22 @@ def main(args):
                     "fixed_loss_b": fixed_loss_all_b[-1],
                     "random_loss_b": random_loss_all_b[-1],
                     "acc_b": acc_all_b[-1],
+                    "balanced_accuracy_a": metrics_a["balanced_accuracy"],
+                    "sensitivity_macro_a": metrics_a["sensitivity_macro"],
+                    "specificity_macro_a": metrics_a["specificity_macro"],
+                    "precision_macro_a": metrics_a["precision_macro"],
+                    "f1_macro_a": metrics_a["f1_macro"],
+                    "auc_ovr_macro_a": metrics_a["auc_ovr_macro"],
+
+                    "balanced_accuracy_b": metrics_b["balanced_accuracy"],
+                    "sensitivity_macro_b": metrics_b["sensitivity_macro"],
+                    "specificity_macro_b": metrics_b["specificity_macro"],
+                    "precision_macro_b": metrics_b["precision_macro"],
+                    "f1_macro_b": metrics_b["f1_macro"],
+                    "auc_ovr_macro_b": metrics_b["auc_ovr_macro"],
                 })
 
+            df_folds = pd.DataFrame(fold_results)
             LOG.info("Finished k-fold cross evaluation.")
             LOG.info("Subtask a results:")
             LOG.info(f"Mean loss:           {np.round(np.mean(loss_all), 4)} ± {np.round(np.std(loss_all), 4)}")
@@ -272,6 +360,11 @@ def main(args):
             LOG.info(f"Mean random loss:    {np.round(np.mean(random_loss_all), 4)} ± {np.round(np.std(random_loss_all), 4)}")
             LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all), 4)} ± {np.round(np.std(acc_all), 4)}")
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all), 4)} ± {np.round(np.std(best_all), 4)}")
+            LOG.info(f"Mean balanced accuracy: {np.round(df_folds['balanced_accuracy_a'].mean(), 4)} ± {np.round(df_folds['balanced_accuracy_a'].std(), 4)}")
+            LOG.info(f"Mean sensitivity macro: {np.round(df_folds['sensitivity_macro_a'].mean(), 4)} ± {np.round(df_folds['sensitivity_macro_a'].std(), 4)}")
+            LOG.info(f"Mean specificity macro: {np.round(df_folds['specificity_macro_a'].mean(), 4)} ± {np.round(df_folds['specificity_macro_a'].std(), 4)}")
+            LOG.info(f"Mean AUC OVR macro:     {np.round(df_folds['auc_ovr_macro_a'].mean(), 4)} ± {np.round(df_folds['auc_ovr_macro_a'].std(), 4)}")
+            LOG.info(f"Mean F1 macro:          {np.round(df_folds['f1_macro_a'].mean(), 4)} ± {np.round(df_folds['f1_macro_a'].std(), 4)}")
             
             LOG.info("Subtask b results:")
             LOG.info(f"Mean loss:           {np.round(np.mean(loss_all_b), 4)} ± {np.round(np.std(loss_all_b), 4)}")
@@ -279,7 +372,11 @@ def main(args):
             LOG.info(f"Mean random loss:    {np.round(np.mean(random_loss_all_b), 4)} ± {np.round(np.std(random_loss_all_b), 4)}")
             LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all_b), 4)} ± {np.round(np.std(acc_all_b), 4)}")
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)} ± {np.round(np.std(best_all_b), 4)}")
-
+            LOG.info(f"Mean balanced accuracy: {np.round(df_folds['balanced_accuracy_b'].mean(), 4)} ± {np.round(df_folds['balanced_accuracy_b'].std(), 4)}")
+            LOG.info(f"Mean sensitivity macro: {np.round(df_folds['sensitivity_macro_b'].mean(), 4)} ± {np.round(df_folds['sensitivity_macro_b'].std(), 4)}")
+            LOG.info(f"Mean specificity macro: {np.round(df_folds['specificity_macro_b'].mean(), 4)} ± {np.round(df_folds['specificity_macro_b'].std(), 4)}")
+            LOG.info(f"Mean AUC OVR macro:     {np.round(df_folds['auc_ovr_macro_b'].mean(), 4)} ± {np.round(df_folds['auc_ovr_macro_b'].std(), 4)}")
+            LOG.info(f"Mean F1 macro:          {np.round(df_folds['f1_macro_b'].mean(), 4)} ± {np.round(df_folds['f1_macro_b'].std(), 4)}")
             # === AGGIUNTO: salvataggio CSV ===
 
             df_epochs = pd.concat(all_epochs_results, ignore_index=True)
@@ -292,7 +389,6 @@ def main(args):
             )
 
             # --- risultati per fold ---
-            df_folds = pd.DataFrame(fold_results)
             df_folds.to_csv(
                 f"{results_dir}/new_results_{n_samples}_{timestamp}.csv",
                 index=False
@@ -327,6 +423,42 @@ def main(args):
 
                 "mean_acc_b": np.mean(acc_all_b),
                 "std_acc_b": np.std(acc_all_b),
+
+                "mean_balanced_accuracy_a": df_folds["balanced_accuracy_a"].mean(),
+                "std_balanced_accuracy_a": df_folds["balanced_accuracy_a"].std(),
+
+                "mean_sensitivity_macro_a": df_folds["sensitivity_macro_a"].mean(),
+                "std_sensitivity_macro_a": df_folds["sensitivity_macro_a"].std(),
+
+                "mean_specificity_macro_a": df_folds["specificity_macro_a"].mean(),
+                "std_specificity_macro_a": df_folds["specificity_macro_a"].std(),
+
+                "mean_precision_macro_a": df_folds["precision_macro_a"].mean(),
+                "std_precision_macro_a": df_folds["precision_macro_a"].std(),
+
+                "mean_f1_macro_a": df_folds["f1_macro_a"].mean(),
+                "std_f1_macro_a": df_folds["f1_macro_a"].std(),
+
+                "mean_auc_ovr_macro_a": df_folds["auc_ovr_macro_a"].mean(),
+                "std_auc_ovr_macro_a": df_folds["auc_ovr_macro_a"].std(),
+
+                "mean_balanced_accuracy_b": df_folds["balanced_accuracy_b"].mean(),
+                "std_balanced_accuracy_b": df_folds["balanced_accuracy_b"].std(),
+
+                "mean_sensitivity_macro_b": df_folds["sensitivity_macro_b"].mean(),
+                "std_sensitivity_macro_b": df_folds["sensitivity_macro_b"].std(),
+
+                "mean_specificity_macro_b": df_folds["specificity_macro_b"].mean(),
+                "std_specificity_macro_b": df_folds["specificity_macro_b"].std(),
+
+                "mean_precision_macro_b": df_folds["precision_macro_b"].mean(),
+                "std_precision_macro_b": df_folds["precision_macro_b"].std(),
+
+                "mean_f1_macro_b": df_folds["f1_macro_b"].mean(),
+                "std_f1_macro_b": df_folds["f1_macro_b"].std(),
+
+                "mean_auc_ovr_macro_b": df_folds["auc_ovr_macro_b"].mean(),
+                "std_auc_ovr_macro_b": df_folds["auc_ovr_macro_b"].std(),
             }])
 
             df_summary.to_csv(
