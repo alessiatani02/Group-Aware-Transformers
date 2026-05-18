@@ -38,16 +38,21 @@ def compute_multiclass_metrics(y_true, y_pred, y_prob):
         "f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
     }
 
+    # AUC: caso binario vs multiclass
     try:
-        metrics["auc_ovr_macro"] = roc_auc_score(
-            y_true,
-            y_prob,
-            multi_class="ovr",
-            average="macro"
-        )
+        if y_prob.shape[1] == 2:
+            metrics["auc"] = roc_auc_score(y_true, y_prob[:, 1])
+        else:
+            metrics["auc"] = roc_auc_score(
+                y_true,
+                y_prob,
+                multi_class="ovr",
+                average="macro"
+            )
     except ValueError:
-        metrics["auc_ovr_macro"] = np.nan
+        metrics["auc"] = np.nan
 
+    # Specificity macro, utile per multiclass
     specificities = []
 
     for label in labels:
@@ -64,6 +69,20 @@ def compute_multiclass_metrics(y_true, y_pred, y_prob):
         specificities.append(specificity)
 
     metrics["specificity_macro"] = np.nanmean(specificities)
+
+    # Specificity binaria classica, confrontabile con GLMM
+    if set(labels) == {0, 1}:
+        tn, fp, fn, tp = confusion_matrix(
+            y_true,
+            y_pred,
+            labels=[0, 1]
+        ).ravel()
+
+        metrics["specificity_binary"] = tn / (tn + fp) if (tn + fp) > 0 else np.nan
+        metrics["sensitivity_binary"] = tp / (tp + fn) if (tp + fn) > 0 else np.nan
+    else:
+        metrics["specificity_binary"] = np.nan
+        metrics["sensitivity_binary"] = np.nan
 
     return metrics
 
@@ -88,48 +107,94 @@ def main(args):
     for hyperparams in parameter_grid(params["hyper"]):
         for trainparams in parameter_grid(params["training"]):
 
+            # print("START LOADING CSV", flush=True)
+            # LOG.info("Loading Amazon dataset...")
+            # ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full_encoded.csv")
+            # #per il test
+            # # ---- SAMPLE SUI GRUPPI ----
+            # target_n_samples = 50000
+
+            # products = ver["participant"].unique()
+            # np.random.shuffle(products)
+
+            # selected_products = []
+            # current_n = 0
+
+            # for p in products:
+            #     group_size = (ver["participant"] == p).sum()
+        
+            #     selected_products.append(p)
+            #     current_n += group_size
+        
+            #     if current_n >= target_n_samples:
+            #         break
+
+            # ver = ver[ver["participant"].isin(selected_products)]
+            # ver["participant"] = pd.factorize(ver["participant"])[0]
+
+            # print("N samples dopo group sampling:", len(ver))
+            # print("N groups:", ver["participant"].nunique())
+            
+            # n_groups = ver["participant"].nunique()
+            # print(f"Numero di gruppi (products): {n_groups}")
+            # LOG.info(f"Number of groups (products): {n_groups}")
+
+            # ver["modal_response"] = ver["target"]
+            # ver["modal_response"] = ver["modal_response"].astype(int)
+            # ver["target"] = ver["target"].astype(int)
+            # hyperparams["n_participants"] = ver.participant.nunique()
+            # hyperparams["n_items"] = len(ver)
+            # print("CSV LOADED", flush=True)
+            # LOG.info("...Complete.")
+
             print("START LOADING CSV", flush=True)
             LOG.info("Loading Amazon dataset...")
+
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full_encoded.csv")
-            #per il test
-            # ---- SAMPLE SUI GRUPPI ----
-            target_n_samples = 50000
+            ver = ver.reset_index(drop=True)
+            ver["global_idx"] = np.arange(len(ver))
 
-            products = ver["participant"].unique()
-            np.random.shuffle(products)
+            glmm_meta = pd.read_csv(
+                "/work/u10767335/glmm/amazon_50k_glmm_metadata_group_sampling.csv"
+            )
 
-            selected_products = []
-            current_n = 0
+            selected_idx = glmm_meta["global_idx"].values
 
-            for p in products:
-                group_size = (ver["participant"] == p).sum()
-        
-                selected_products.append(p)
-                current_n += group_size
-        
-                if current_n >= target_n_samples:
-                    break
+            ver = ver[ver["global_idx"].isin(selected_idx)].copy()
+            ver = ver.sort_values("global_idx").reset_index(drop=True)
 
-            ver = ver[ver["participant"].isin(selected_products)]
-            ver["participant"] = pd.factorize(ver["participant"])[0]
+            # target binaria come nel GLMM:
+            # originale: 0 = negativo, 2 = positivo
+            ver = ver[ver["target"].isin([0, 2])].copy()
+            ver["target"] = (ver["target"] == 2).astype(int)
 
-            print("N samples dopo group sampling:", len(ver))
-            print("N groups:", ver["participant"].nunique())
-            
-            n_groups = ver["participant"].nunique()
-            print(f"Numero di gruppi (products): {n_groups}")
-            LOG.info(f"Number of groups (products): {n_groups}")
-
-            ver["modal_response"] = ver["target"]
-            ver["modal_response"] = ver["modal_response"].astype(int)
+            ver["modal_response"] = ver["target"].astype(int)
             ver["target"] = ver["target"].astype(int)
-            hyperparams["n_participants"] = ver.participant.nunique()
-            hyperparams["n_items"] = len(ver)
-            print("CSV LOADED", flush=True)
-            LOG.info("...Complete.")
+
+            # salva id prodotto originale per confronto random intercept
+            ver["participant_original"] = ver["participant"]
+            ver["participant"] = pd.factorize(ver["participant"])[0]
 
             n_samples = len(ver)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+
+            participant_map = ver[["participant", "participant_original"]].drop_duplicates()
+            participant_map.to_csv(
+                f"{results_dir}/binary_participant_map_{n_samples}_{timestamp}.csv",
+                index=False
+            )
+
+            n_groups = ver["participant"].nunique()
+    
+            hyperparams["n_participants"] = ver.participant.nunique()
+            hyperparams["n_items"] = len(ver)
+
+
+            print("N samples binary:", len(ver))
+            print("N groups:", n_groups)
+            print("Target distribution:")
+            print(ver["target"].value_counts().sort_index())
+
 
             # Log the device being used
             if hyperparams["device"] == "cuda" and torch.cuda.is_available():
@@ -285,9 +350,9 @@ def main(args):
                 LOG.info(f"Mean accuracy:       {acc_mean}")
                 LOG.info(f"Prop. best possible: {best_mean}")
                 LOG.info(f"Balanced accuracy:   {metrics_a['balanced_accuracy']}")
-                LOG.info(f"Sensitivity macro:   {metrics_a['sensitivity_macro']}")
-                LOG.info(f"Specificity macro:   {metrics_a['specificity_macro']}")
-                LOG.info(f"AUC OVR macro:       {metrics_a['auc_ovr_macro']}")
+                LOG.info(f"Sensitivity binary:   {metrics_a['sensitivity_binary']}")
+                LOG.info(f"Specificity binary:   {metrics_a['specificity_binary']}")
+                LOG.info(f"AUC:                 {metrics_a['auc']}")
 
                 # Evaluate the model on the test fold on subtask 'b'
                 LOG.info("Evaluating subtask b")
@@ -323,9 +388,9 @@ def main(args):
                 LOG.info(f"Mean accuracy:       {acc_mean}")
                 LOG.info(f"Prop. best possible: {best_mean}")
                 LOG.info(f"Balanced accuracy:   {metrics_b['balanced_accuracy']}")
-                LOG.info(f"Sensitivity macro:   {metrics_b['sensitivity_macro']}")
-                LOG.info(f"Specificity macro:   {metrics_b['specificity_macro']}")
-                LOG.info(f"AUC OVR macro:       {metrics_b['auc_ovr_macro']}")
+                LOG.info(f"Sensitivity binary:   {metrics_b['sensitivity_binary']}")
+                LOG.info(f"Specificity binary:   {metrics_b['specificity_binary']}")
+                LOG.info(f"AUC:                  {metrics_b['auc']}")
                 # === AGGIUNTO: salvataggio risultati per fold ===
                 fold_results.append({
                     "fold": i,
@@ -338,18 +403,18 @@ def main(args):
                     "random_loss_b": random_loss_all_b[-1],
                     "acc_b": acc_all_b[-1],
                     "balanced_accuracy_a": metrics_a["balanced_accuracy"],
-                    "sensitivity_macro_a": metrics_a["sensitivity_macro"],
-                    "specificity_macro_a": metrics_a["specificity_macro"],
+                    "sensitivity_binary_a": metrics_a["sensitivity_binary"],
+                    "specificity_binary_a": metrics_a["specificity_binary"],
                     "precision_macro_a": metrics_a["precision_macro"],
                     "f1_macro_a": metrics_a["f1_macro"],
-                    "auc_ovr_macro_a": metrics_a["auc_ovr_macro"],
+                    "auc_a": metrics_a["auc"],
 
                     "balanced_accuracy_b": metrics_b["balanced_accuracy"],
-                    "sensitivity_macro_b": metrics_b["sensitivity_macro"],
-                    "specificity_macro_b": metrics_b["specificity_macro"],
+                    "sensitivity_binary_b": metrics_b["sensitivity_binary"],
+                    "specificity_binary_b": metrics_b["specificity_binary"],
                     "precision_macro_b": metrics_b["precision_macro"],
                     "f1_macro_b": metrics_b["f1_macro"],
-                    "auc_ovr_macro_b": metrics_b["auc_ovr_macro"],
+                    "auc_b": metrics_b["auc"],
                 })
 
             df_folds = pd.DataFrame(fold_results)
@@ -361,9 +426,9 @@ def main(args):
             LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all), 4)} ± {np.round(np.std(acc_all), 4)}")
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all), 4)} ± {np.round(np.std(best_all), 4)}")
             LOG.info(f"Mean balanced accuracy: {np.round(df_folds['balanced_accuracy_a'].mean(), 4)} ± {np.round(df_folds['balanced_accuracy_a'].std(), 4)}")
-            LOG.info(f"Mean sensitivity macro: {np.round(df_folds['sensitivity_macro_a'].mean(), 4)} ± {np.round(df_folds['sensitivity_macro_a'].std(), 4)}")
-            LOG.info(f"Mean specificity macro: {np.round(df_folds['specificity_macro_a'].mean(), 4)} ± {np.round(df_folds['specificity_macro_a'].std(), 4)}")
-            LOG.info(f"Mean AUC OVR macro:     {np.round(df_folds['auc_ovr_macro_a'].mean(), 4)} ± {np.round(df_folds['auc_ovr_macro_a'].std(), 4)}")
+            LOG.info(f"Mean sensitivity binary: {np.round(df_folds['sensitivity_binary_a'].mean(), 4)} ± {np.round(df_folds['sensitivity_binary_a'].std(), 4)}")
+            LOG.info(f"Mean specificity binary: {np.round(df_folds['specificity_binary_a'].mean(), 4)} ± {np.round(df_folds['specificity_binary_a'].std(), 4)}")
+            LOG.info(f"Mean AUC :           {np.round(df_folds['auc_a'].mean(), 4)} ± {np.round(df_folds['auc_a'].std(), 4)}")
             LOG.info(f"Mean F1 macro:          {np.round(df_folds['f1_macro_a'].mean(), 4)} ± {np.round(df_folds['f1_macro_a'].std(), 4)}")
             
             LOG.info("Subtask b results:")
@@ -373,9 +438,9 @@ def main(args):
             LOG.info(f"Mean accuracy:       {np.round(np.mean(acc_all_b), 4)} ± {np.round(np.std(acc_all_b), 4)}")
             LOG.info(f"Prop. best possible: {np.round(np.mean(best_all_b), 4)} ± {np.round(np.std(best_all_b), 4)}")
             LOG.info(f"Mean balanced accuracy: {np.round(df_folds['balanced_accuracy_b'].mean(), 4)} ± {np.round(df_folds['balanced_accuracy_b'].std(), 4)}")
-            LOG.info(f"Mean sensitivity macro: {np.round(df_folds['sensitivity_macro_b'].mean(), 4)} ± {np.round(df_folds['sensitivity_macro_b'].std(), 4)}")
-            LOG.info(f"Mean specificity macro: {np.round(df_folds['specificity_macro_b'].mean(), 4)} ± {np.round(df_folds['specificity_macro_b'].std(), 4)}")
-            LOG.info(f"Mean AUC OVR macro:     {np.round(df_folds['auc_ovr_macro_b'].mean(), 4)} ± {np.round(df_folds['auc_ovr_macro_b'].std(), 4)}")
+            LOG.info(f"Mean sensitivity binary: {np.round(df_folds['sensitivity_binary_b'].mean(), 4)} ± {np.round(df_folds['sensitivity_binary_b'].std(), 4)}")
+            LOG.info(f"Mean specificity binary: {np.round(df_folds['specificity_binary_b'].mean(), 4)} ± {np.round(df_folds['specificity_binary_b'].std(), 4)}")
+            LOG.info(f"Mean AUC :     {np.round(df_folds['auc_b'].mean(), 4)} ± {np.round(df_folds['auc_b'].std(), 4)}")
             LOG.info(f"Mean F1 macro:          {np.round(df_folds['f1_macro_b'].mean(), 4)} ± {np.round(df_folds['f1_macro_b'].std(), 4)}")
             # === AGGIUNTO: salvataggio CSV ===
 
@@ -384,13 +449,13 @@ def main(args):
             
 
             df_epochs.to_csv(
-                f"{results_dir}/new_epochs_ALL_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/binary_new_epochs_ALL_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
             # --- risultati per fold ---
             df_folds.to_csv(
-                f"{results_dir}/new_results_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/binary_new_results_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
@@ -427,11 +492,11 @@ def main(args):
                 "mean_balanced_accuracy_a": df_folds["balanced_accuracy_a"].mean(),
                 "std_balanced_accuracy_a": df_folds["balanced_accuracy_a"].std(),
 
-                "mean_sensitivity_macro_a": df_folds["sensitivity_macro_a"].mean(),
-                "std_sensitivity_macro_a": df_folds["sensitivity_macro_a"].std(),
+                "mean_sensitivity_binary_a": df_folds["sensitivity_binary_a"].mean(),
+                "std_sensitivity_binary_a": df_folds["sensitivity_binary_a"].std(),
 
-                "mean_specificity_macro_a": df_folds["specificity_macro_a"].mean(),
-                "std_specificity_macro_a": df_folds["specificity_macro_a"].std(),
+                "mean_specificity_binary_a": df_folds["specificity_binary_a"].mean(),
+                "std_specificity_binary_a": df_folds["specificity_binary_a"].std(),
 
                 "mean_precision_macro_a": df_folds["precision_macro_a"].mean(),
                 "std_precision_macro_a": df_folds["precision_macro_a"].std(),
@@ -439,17 +504,17 @@ def main(args):
                 "mean_f1_macro_a": df_folds["f1_macro_a"].mean(),
                 "std_f1_macro_a": df_folds["f1_macro_a"].std(),
 
-                "mean_auc_ovr_macro_a": df_folds["auc_ovr_macro_a"].mean(),
-                "std_auc_ovr_macro_a": df_folds["auc_ovr_macro_a"].std(),
+                "mean_auc_a": df_folds["auc_a"].mean(),
+                "std_auc_a": df_folds["auc_a"].std(),
 
                 "mean_balanced_accuracy_b": df_folds["balanced_accuracy_b"].mean(),
                 "std_balanced_accuracy_b": df_folds["balanced_accuracy_b"].std(),
 
-                "mean_sensitivity_macro_b": df_folds["sensitivity_macro_b"].mean(),
-                "std_sensitivity_macro_b": df_folds["sensitivity_macro_b"].std(),
+                "mean_sensitivity_binary_b": df_folds["sensitivity_binary_b"].mean(),
+                "std_sensitivity_binary_b": df_folds["sensitivity_binary_b"].std(),
 
-                "mean_specificity_macro_b": df_folds["specificity_macro_b"].mean(),
-                "std_specificity_macro_b": df_folds["specificity_macro_b"].std(),
+                "mean_specificity_binary_b": df_folds["specificity_binary_b"].mean(),
+                "std_specificity_binary_b": df_folds["specificity_binary_b"].std(),
 
                 "mean_precision_macro_b": df_folds["precision_macro_b"].mean(),
                 "std_precision_macro_b": df_folds["precision_macro_b"].std(),
@@ -457,12 +522,12 @@ def main(args):
                 "mean_f1_macro_b": df_folds["f1_macro_b"].mean(),
                 "std_f1_macro_b": df_folds["f1_macro_b"].std(),
 
-                "mean_auc_ovr_macro_b": df_folds["auc_ovr_macro_b"].mean(),
-                "std_auc_ovr_macro_b": df_folds["auc_ovr_macro_b"].std(),
+                "mean_auc_b": df_folds["auc_b"].mean(),
+                "std_auc_b": df_folds["auc_b"].std(),
             }])
 
             df_summary.to_csv(
-                f"{results_dir}/new_summary_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/binary_new_summary_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
@@ -472,7 +537,7 @@ def main(args):
                 re_all = np.concatenate(all_random_effects, axis=0)
 
                 np.save(
-                    f"{results_dir}/new_random_effects_ALL_{n_samples}_{timestamp}.npy",
+                    f"{results_dir}/binary_new_random_effects_ALL_{n_samples}_{timestamp}.npy",
                     re_all
                 )
 
