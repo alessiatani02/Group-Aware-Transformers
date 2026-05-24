@@ -107,94 +107,100 @@ def main(args):
     for hyperparams in parameter_grid(params["hyper"]):
         for trainparams in parameter_grid(params["training"]):
 
-            # print("START LOADING CSV", flush=True)
-            # LOG.info("Loading Amazon dataset...")
-            # ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full_encoded.csv")
-            # #per il test
-            # # ---- SAMPLE SUI GRUPPI ----
-            # target_n_samples = 50000
-
-            # products = ver["participant"].unique()
-            # np.random.shuffle(products)
-
-            # selected_products = []
-            # current_n = 0
-
-            # for p in products:
-            #     group_size = (ver["participant"] == p).sum()
-        
-            #     selected_products.append(p)
-            #     current_n += group_size
-        
-            #     if current_n >= target_n_samples:
-            #         break
-
-            # ver = ver[ver["participant"].isin(selected_products)]
-            # ver["participant"] = pd.factorize(ver["participant"])[0]
-
-            # print("N samples dopo group sampling:", len(ver))
-            # print("N groups:", ver["participant"].nunique())
-            
-            # n_groups = ver["participant"].nunique()
-            # print(f"Numero di gruppi (products): {n_groups}")
-            # LOG.info(f"Number of groups (products): {n_groups}")
-
-            # ver["modal_response"] = ver["target"]
-            # ver["modal_response"] = ver["modal_response"].astype(int)
-            # ver["target"] = ver["target"].astype(int)
-            # hyperparams["n_participants"] = ver.participant.nunique()
-            # hyperparams["n_items"] = len(ver)
-            # print("CSV LOADED", flush=True)
-            # LOG.info("...Complete.")
-
             print("START LOADING CSV", flush=True)
             LOG.info("Loading Amazon dataset...")
-
             ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full_encoded.csv")
-            ver = ver.reset_index(drop=True)
-            ver["global_idx"] = np.arange(len(ver))
+            #per il test
+            # ---- SAMPLE SUI GRUPPI ----
+            target_n_samples = 50000
 
-            glmm_meta = pd.read_csv(
-                "/work/u10767335/glmm/amazon_50k_glmm_metadata_group_sampling.csv"
-            )
+            products = ver["participant"].unique()
+            np.random.shuffle(products)
 
-            selected_idx = glmm_meta["global_idx"].values
+            selected_products = []
+            current_n = 0
 
-            ver = ver[ver["global_idx"].isin(selected_idx)].copy()
-            ver = ver.sort_values("global_idx").reset_index(drop=True)
+            for p in products:
+                group_size = (ver["participant"] == p).sum()
+        
+                selected_products.append(p)
+                current_n += group_size
+        
+                if current_n >= target_n_samples:
+                    break
 
-            # target binaria come nel GLMM:
-            # originale: 0 = negativo, 2 = positivo
-            ver = ver[ver["target"].isin([0, 2])].copy()
-            ver["target"] = (ver["target"] == 2).astype(int)
-
-            ver["modal_response"] = ver["target"].astype(int)
-            ver["target"] = ver["target"].astype(int)
-
-            # salva id prodotto originale per confronto random intercept
-            ver["participant_original"] = ver["participant"]
+            ver = ver[ver["participant"].isin(selected_products)]
             ver["participant"] = pd.factorize(ver["participant"])[0]
 
-            n_samples = len(ver)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-
-            participant_map = ver[["participant", "participant_original"]].drop_duplicates()
-            participant_map.to_csv(
-                f"{results_dir}/binary_participant_map_{n_samples}_{timestamp}.csv",
-                index=False
-            )
-
+            print("N samples dopo group sampling:", len(ver))
+            print("N groups:", ver["participant"].nunique())
+            
             n_groups = ver["participant"].nunique()
-    
+            print(f"Numero di gruppi (products): {n_groups}")
+            LOG.info(f"Number of groups (products): {n_groups}")
+
+            ver["modal_response"] = ver["target"]
+            ver["modal_response"] = ver["modal_response"].astype(int)
+            ver["target"] = ver["target"].astype(int)
             hyperparams["n_participants"] = ver.participant.nunique()
             hyperparams["n_items"] = len(ver)
+            n_samples = len(ver)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            print("CSV LOADED", flush=True)
+            LOG.info("...Complete.")
 
 
-            print("N samples binary:", len(ver))
-            print("N groups:", n_groups)
-            print("Target distribution:")
-            print(ver["target"].value_counts().sort_index())
+            # ###########################################
+            # # RUN BINARIO
+            # ###########################################
+            # print("START LOADING CSV", flush=True)
+            # LOG.info("Loading Amazon dataset...")
 
+            # ver = pd.read_csv("/work/u10767335/data/amazon_model_dataset_full_encoded.csv")
+            # ver = ver.reset_index(drop=True)
+            # ver["global_idx"] = np.arange(len(ver))
+
+            # glmm_meta = pd.read_csv(
+            #     "/work/u10767335/glmm/amazon_50k_glmm_metadata_group_sampling.csv"
+            # )
+
+            # selected_idx = glmm_meta["global_idx"].values
+
+            # ver = ver[ver["global_idx"].isin(selected_idx)].copy()
+            # ver = ver.sort_values("global_idx").reset_index(drop=True)
+
+            # # target binaria come nel GLMM:
+            # # originale: 0 = negativo, 2 = positivo
+            # ver = ver[ver["target"].isin([0, 2])].copy()
+            # ver["target"] = (ver["target"] == 2).astype(int)
+
+            # ver["modal_response"] = ver["target"].astype(int)
+            # ver["target"] = ver["target"].astype(int)
+
+            # # salva id prodotto originale per confronto random intercept
+            # ver["participant_original"] = ver["participant"]
+            # ver["participant"] = pd.factorize(ver["participant"])[0]
+
+            # n_samples = len(ver)
+            # timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+
+            # participant_map = ver[["participant", "participant_original"]].drop_duplicates()
+            # participant_map.to_csv(
+            #     f"{results_dir}/binary_participant_map_{n_samples}_{timestamp}.csv",
+            #     index=False
+            # )
+
+            # n_groups = ver["participant"].nunique()
+    
+            # hyperparams["n_participants"] = ver.participant.nunique()
+            # hyperparams["n_items"] = len(ver)
+
+
+            # print("N samples binary:", len(ver))
+            # print("N groups:", n_groups)
+            # print("Target distribution:")
+            # print(ver["target"].value_counts().sort_index())
+#################################################################################
 
             # Log the device being used
             if hyperparams["device"] == "cuda" and torch.cuda.is_available():
@@ -449,13 +455,13 @@ def main(args):
             
 
             df_epochs.to_csv(
-                f"{results_dir}/binary_new_epochs_ALL_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/fixed_only_new_epochs_ALL_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
             # --- risultati per fold ---
             df_folds.to_csv(
-                f"{results_dir}/binary_new_results_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/fixed_only_new_results_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
@@ -527,7 +533,7 @@ def main(args):
             }])
 
             df_summary.to_csv(
-                f"{results_dir}/binary_new_summary_{n_samples}_{timestamp}.csv",
+                f"{results_dir}/fixed_only_new_summary_{n_samples}_{timestamp}.csv",
                 index=False
             )
 
@@ -537,7 +543,7 @@ def main(args):
                 re_all = np.concatenate(all_random_effects, axis=0)
 
                 np.save(
-                    f"{results_dir}/binary_new_random_effects_ALL_{n_samples}_{timestamp}.npy",
+                    f"{results_dir}/fixed_only_new_random_effects_ALL_{n_samples}_{timestamp}.npy",
                     re_all
                 )
 

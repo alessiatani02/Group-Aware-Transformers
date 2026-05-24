@@ -167,7 +167,8 @@ class NaturalLanguageInferenceTrainer:
                 else:
                     fixed_loss = lossfunc(prediction, target)
 
-                loss = fixed_loss + lambda_random * random_loss
+                #loss = fixed_loss + lambda_random * random_loss
+                loss = fixed_loss
 
                 # Shouldn't this include the random loss? -B.K.
                 # loss_trace.append(loss.item()-random_loss.item())
